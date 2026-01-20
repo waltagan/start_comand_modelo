@@ -117,7 +117,7 @@ pip install --no-cache-dir \
 # Grupo 3: Geração Estruturada
 pip install --no-cache-dir \
     "xgrammar>=0.1.0" \
-    "outlines>=0.0.44" \
+    "outlines>=0.0.44,<1.0.0" \
     interegular lark gguf
 
 # Grupo 4: Multimodal
