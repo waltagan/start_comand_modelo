@@ -1,0 +1,22 @@
+# ============================================================
+# COMANDO PARA RUNPOD - ministral3b_sglang_uv_v21.sh
+# Cole este comando no campo "Container Start Command" do RunPod
+#
+# UV EDITION v21.0 - SGLANG DO GITHUB (SUPORTE MISTRAL 3)
+#
+# ⚠️ CONFIGURAÇÃO:
+#
+# Container Image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+# Environment Variables: HF_TOKEN = seu_token
+#
+# CORREÇÕES v21:
+# - SGLang instalado do GitHub main branch
+# - Inclui PR #5099 (suporte Mistral3ForConditionalGeneration)
+# - Suporte completo ao modelo Ministral 3
+#
+# NOTA: O tempo de inicialização será maior (~10-15 min)
+# pois o SGLang é compilado do source.
+# ============================================================
+
+bash -c 'apt-get update && apt-get install -y curl && curl -sL https://raw.githubusercontent.com/waltagan/start_comand_modelo/main/ministral3b_sglang_uv_v21.sh > /tmp/start.sh && bash /tmp/start.sh'
+
