@@ -3,13 +3,6 @@
 # SCRIPT PARA RUNPOD - Ministral 3B com SGLang
 # GPU: NVIDIA A40 (Ampere SM 8.6, 48GB VRAM)
 # Repositório: https://github.com/waltagan/start_comand_modelo
-# 
-# CONFIGURAÇÃO DO RUNPOD:
-# - Container image: nvidia/cuda:12.4.1-devel-ubuntu22.04
-# - Container disk: 50 GB
-# - Volume disk: 75 GB
-# - Volume mount: /workspace
-# - HTTP ports: 30000
 # ============================================================
 
 set -e
@@ -27,7 +20,7 @@ echo "============================================================"
 # --- ETAPA 1: DEPENDÊNCIAS DE SISTEMA ---
 echo "[1/10] Instalando dependências do sistema..."
 apt-get update && apt-get install -y --no-install-recommends \
-    python3-venv python3-pip python3-dev git wget \
+    python3-venv python3-pip python3-dev git wget curl \
     build-essential ffmpeg libsndfile1 libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -114,4 +107,3 @@ python3 -m sglang.launch_server \
     --max-running-requests 64 \
     --disable-cuda-graph-padding \
     --log-level info
-
