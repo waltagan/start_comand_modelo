@@ -3,7 +3,7 @@
 # SCRIPT PARA RUNPOD - Ministral 3B com SGLang
 # GPU: NVIDIA A40 (Ampere SM 8.6, 48GB VRAM)
 # Repositório: https://github.com/waltagan/start_comand_modelo
-# Versão: 1.2 - Fix: adicionado dill e outras deps faltantes
+# Versão: 2.0 - Dependências completas baseadas no pyproject.toml oficial
 # ============================================================
 
 set -e
@@ -14,7 +14,7 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
 echo "============================================================"
 echo "[BOOT] SGLang Server - Ministral 3B (Otimizado A40)"
-echo "[INFO] PyTorch 2.4.1 | FlashInfer 0.2.x | CUDA 12.4"
+echo "[INFO] PyTorch 2.4.1 | FlashInfer | CUDA 12.4"
 echo "[DATA] $(date)"
 echo "============================================================"
 
@@ -22,7 +22,8 @@ echo "============================================================"
 echo "[1/10] Instalando dependências do sistema..."
 apt-get update && apt-get install -y --no-install-recommends \
     python3-venv python3-pip python3-dev git wget curl \
-    build-essential ffmpeg libsndfile1 libgl1 libglib2.0-0 \
+    build-essential cmake ninja-build \
+    ffmpeg libsndfile1 libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # --- ETAPA 2: AMBIENTE VIRTUAL ---
@@ -47,49 +48,150 @@ pip install --no-cache-dir flashinfer-python \
     -i https://flashinfer.ai/whl/cu124/torch2.4
 
 # --- ETAPA 6: TRANSFORMERS E TOKENIZER ---
-echo "[6/10] Instalando Transformers..."
+echo "[6/10] Instalando Transformers e Tokenizers..."
 pip install --no-cache-dir \
     "transformers>=4.46.0,<5.0.0" "tokenizers>=0.21.0" \
     "huggingface_hub>=0.26.0" "mistral_common>=1.5.0" \
     "tiktoken>=0.7.0" protobuf sentencepiece
 
-# --- ETAPA 7: DEPENDÊNCIAS DE RUNTIME ---
+# --- ETAPA 7: DEPENDÊNCIAS DE RUNTIME CRÍTICAS ---
 echo "[7/10] Instalando dependências de runtime..."
-pip install --no-cache-dir \
-    "pybase64>=1.4.0" "orjson>=3.10.0" "python-multipart>=0.0.9" \
-    "pyzmq>=26.0.0" "uvloop>=0.19.0" "fastapi>=0.115.0" \
-    "uvicorn[standard]>=0.32.0" httptools watchfiles "pydantic>=2.0.0" \
-    "outlines>=0.0.44" gguf interegular lark \
-    psutil requests aiohttp tqdm regex rich setproctitle prometheus-client
 
-# --- ETAPA 8: DEPENDÊNCIAS DO SGLANG (CORRIGIDO) ---
+# I/O e Serialização (CRÍTICO - inclui pybase64)
+pip install --no-cache-dir \
+    "pybase64>=1.4.0" \
+    "orjson>=3.10.0" \
+    "msgspec>=0.18.0" \
+    "python-multipart>=0.0.9" \
+    "pyzmq>=25.1.2"
+
+# Web Server
+pip install --no-cache-dir \
+    "fastapi>=0.115.0" \
+    "uvicorn[standard]>=0.32.0" \
+    "uvloop>=0.19.0" \
+    httptools watchfiles \
+    "pydantic>=2.0.0"
+
+# Geração Estruturada (CRÍTICO - xgrammar)
+pip install --no-cache-dir \
+    "xgrammar>=0.1.0" \
+    "outlines>=0.0.44" \
+    interegular lark gguf
+
+# Multimodal (CRÍTICO - opencv headless e decord)
+pip install --no-cache-dir \
+    "opencv-python-headless>=4.10.0" \
+    "pillow>=10.0.0" \
+    "decord>=0.6.0" || pip install --no-cache-dir av
+pip install --no-cache-dir \
+    soundfile imageio einops timm
+
+# Utilidades
+pip install --no-cache-dir \
+    psutil requests aiohttp tqdm regex rich \
+    setproctitle prometheus-client nvidia-ml-py
+
+# --- ETAPA 8: DEPENDÊNCIAS DO SGLANG ---
 echo "[8/10] Instalando dependências do SGLang..."
 pip install --no-cache-dir \
-    ipython openai anthropic diskcache cloudpickle rpyc \
-    partial-json-parser compressed-tensors scipy \
-    dill pickle5 msgspec zmq filelock msgpack
+    ipython openai anthropic \
+    diskcache cloudpickle rpyc \
+    partial-json-parser compressed-tensors \
+    scipy dill pickle5 filelock msgpack blobfile
+
+# Quantização (torchao - pode falhar em PyTorch 2.4)
+pip install --no-cache-dir torchao 2>/dev/null || echo "[WARN] torchao não compatível com PyTorch 2.4"
 
 # --- ETAPA 9: SGLANG CORE ---
 echo "[9/10] Instalando SGLang..."
 pip install --no-cache-dir --no-deps "sglang[all]>=0.4.3"
 pip install --no-cache-dir sgl-kernel \
     -i https://flashinfer.ai/whl/cu124/torch2.4 2>/dev/null || true
+
+# Corrigir numpy após instalações
 pip install --no-cache-dir "numpy<2.0.0"
 
-# Instalar dependências extras que o --no-deps pulou
-pip install --no-cache-dir dill triton vllm 2>/dev/null || true
-
 # --- ETAPA 10: VERIFICAÇÃO ---
-echo "[10/10] Verificação..."
-python3 -c "
+echo "[10/10] Verificação completa..."
+python3 << 'VERIFY_EOF'
+import sys
+print("\n" + "="*60)
+print("VERIFICAÇÃO DE DEPENDÊNCIAS CRÍTICAS")
+print("="*60)
+
+errors = []
+
+# PyTorch
 import torch
-print(f'PyTorch: {torch.__version__}')
-print(f'CUDA: {torch.cuda.is_available()}')
+print(f"✓ PyTorch: {torch.__version__}")
 if torch.cuda.is_available():
-    print(f'GPU: {torch.cuda.get_device_name(0)}')
-import dill
-print('dill: OK')
-"
+    print(f"  GPU: {torch.cuda.get_device_name(0)}")
+
+# FlashInfer
+try:
+    import flashinfer
+    print(f"✓ FlashInfer: {flashinfer.__version__}")
+except: print("⚠ FlashInfer: não carregado (JIT)")
+
+# pybase64 (CRÍTICO)
+try:
+    import pybase64
+    print(f"✓ pybase64: disponível")
+except ImportError:
+    errors.append("pybase64 não instalado!")
+
+# xgrammar (CRÍTICO)
+try:
+    import xgrammar
+    print(f"✓ xgrammar: disponível")
+except ImportError:
+    print("⚠ xgrammar: não disponível")
+
+# OpenCV Headless
+try:
+    import cv2
+    print(f"✓ OpenCV: {cv2.__version__}")
+except ImportError:
+    errors.append("opencv-python-headless não instalado!")
+
+# orjson
+try:
+    import orjson
+    print(f"✓ orjson: disponível")
+except ImportError:
+    errors.append("orjson não instalado!")
+
+# msgspec
+try:
+    import msgspec
+    print(f"✓ msgspec: disponível")
+except ImportError:
+    print("⚠ msgspec: não disponível")
+
+# Numpy
+import numpy
+print(f"✓ Numpy: {numpy.__version__}")
+if numpy.__version__.startswith("2"):
+    errors.append("Numpy deve ser < 2.0!")
+
+# SGLang
+try:
+    import sglang
+    print(f"✓ SGLang: {sglang.__version__}")
+except Exception as e:
+    errors.append(f"SGLang: {e}")
+
+print("-"*60)
+if errors:
+    print("ERROS CRÍTICOS:")
+    for e in errors:
+        print(f"  ✗ {e}")
+    sys.exit(1)
+else:
+    print("✓ TODAS DEPENDÊNCIAS CRÍTICAS OK!")
+print("="*60 + "\n")
+VERIFY_EOF
 
 # Limpa locks
 rm -rf ~/.cache/huggingface/hub/.locks/* 2>/dev/null || true
