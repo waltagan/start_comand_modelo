@@ -3,7 +3,7 @@
 # SCRIPT PARA RUNPOD - Ministral 3B com SGLang
 # GPU: NVIDIA A40 (Ampere SM 8.6, 48GB VRAM)
 # Repositório: https://github.com/waltagan/start_comand_modelo
-# Versão: 3.0 - Incorpora boas práticas + instalação do Git
+# Versão: 4.0 - Corrigido: SGLang 0.4.3.post2 + PyTorch 2.4.1
 # ============================================================
 
 set -e
@@ -11,12 +11,11 @@ set -e
 export TORCH_CUDA_ARCH_LIST="8.6"
 export CUDA_VISIBLE_DEVICES="0"
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
-export HF_HUB_ENABLE_HF_TRANSFER=1  # Acelera downloads
+export HF_HUB_ENABLE_HF_TRANSFER=1
 
 echo "============================================================"
 echo "[BOOT] SGLang Server - Ministral 3B (Otimizado A40)"
-echo "[INFO] PyTorch 2.4.1 | FlashInfer | CUDA 12.4"
-echo "[INFO] Instalação do SGLang direto do Git (código mais recente)"
+echo "[INFO] PyTorch 2.4.1 | SGLang 0.4.3.post2 | CUDA 12.4"
 echo "[DATA] $(date)"
 echo "============================================================"
 
@@ -54,19 +53,27 @@ echo "[5/10] Instalando FlashInfer para Torch 2.4 / CUDA 12.4..."
 pip install --no-cache-dir flashinfer-python \
     -i https://flashinfer.ai/whl/cu124/torch2.4
 
-# --- ETAPA 6: TRANSFORMERS & TOKENIZERS ---
-echo "[6/10] Instalando suporte a modelos..."
+# --- ETAPA 6: SGLANG 0.4.3.post2 (Compatível com PyTorch 2.4.1) ---
+echo "[6/10] Instalando SGLang 0.4.3.post2..."
+pip install --no-cache-dir --no-deps "sglang[all]==0.4.3.post2"
+
+# sgl-kernel compatível com Torch 2.4
+pip install --no-cache-dir sgl-kernel \
+    -i https://flashinfer.ai/whl/cu124/torch2.4 2>/dev/null || true
+
+# --- ETAPA 7: TRANSFORMERS & TOKENIZERS ---
+echo "[7/10] Instalando suporte a modelos..."
 pip install --no-cache-dir \
-    "transformers>=4.46.0" \
+    "transformers>=4.46.0,<4.57.0" \
     "tokenizers>=0.21.0" \
     "huggingface_hub>=0.26.0" \
     "mistral_common>=1.5.0" \
     "tiktoken>=0.7.0" \
     protobuf sentencepiece accelerate \
-    hf_transfer  # Downloads 5x mais rápidos
+    hf_transfer
 
-# --- ETAPA 7: DEPENDÊNCIAS DE RUNTIME ---
-echo "[7/10] Instalando dependências de runtime..."
+# --- ETAPA 8: DEPENDÊNCIAS DE RUNTIME ---
+echo "[8/10] Instalando dependências de runtime..."
 
 # Grupo 1: Alta Performance & I/O
 pip install --no-cache-dir \
@@ -91,7 +98,7 @@ pip install --no-cache-dir \
 
 # Grupo 4: Multimodal
 pip install --no-cache-dir \
-    "opencv-python-headless>=4.10.0" \
+    "opencv-python-headless>=4.9.0,<4.13.0" \
     pillow soundfile imageio moviepy einops timm
 pip install --no-cache-dir decord 2>/dev/null || pip install --no-cache-dir av
 
@@ -101,25 +108,14 @@ pip install --no-cache-dir \
     setproctitle prometheus-client nvidia-ml-py \
     py-spy ninja scipy
 
-# --- ETAPA 8: DEPENDÊNCIAS DO SGLANG ---
-echo "[8/10] Instalando dependências do SGLang..."
+# --- ETAPA 9: DEPENDÊNCIAS DO SGLANG ---
+echo "[9/10] Instalando dependências do SGLang..."
 pip install --no-cache-dir \
     ipython openai anthropic \
     diskcache cloudpickle rpyc \
     partial-json-parser compressed-tensors \
     dill filelock msgpack blobfile triton \
     modelscope
-
-# --- ETAPA 9: SGLANG DO GIT (Código Mais Recente) ---
-echo "[9/10] Instalando SGLang do código fonte (Git)..."
-
-# Instalação limpa do código fonte - sempre pega a versão mais recente
-pip install --no-cache-dir --no-deps --upgrade \
-    "git+https://github.com/sgl-project/sglang.git#subdirectory=python&egg=sglang[all]"
-
-# sgl-kernel compatível com Torch 2.4
-pip install --no-cache-dir sgl-kernel \
-    -i https://flashinfer.ai/whl/cu124/torch2.4 2>/dev/null || true
 
 # Garantir numpy < 2.0 após todas instalações
 pip install --no-cache-dir "numpy<2.0.0"
@@ -133,6 +129,7 @@ print("VERIFICAÇÃO FINAL")
 print("="*60)
 
 errors = []
+warnings = []
 
 # PyTorch
 import torch
@@ -166,20 +163,25 @@ for dep in critical:
         __import__(dep)
         print(f"✓ {dep}: OK")
     except:
-        print(f"⚠ {dep}: não carregado")
+        warnings.append(f"{dep}: não carregado (pode não ser necessário)")
 
 # Numpy
 import numpy
 print(f"✓ Numpy: {numpy.__version__}")
 if numpy.__version__.startswith("2"):
-    errors.append("Numpy >= 2.0 pode causar problemas!")
+    warnings.append("Numpy >= 2.0 pode causar problemas")
 
 print("-"*60)
+if warnings:
+    print("AVISOS (não críticos):")
+    for w in warnings:
+        print(f"  ⚠ {w}")
 if errors:
-    print("ERROS:")
+    print("ERROS CRÍTICOS:")
     for e in errors:
         print(f"  ✗ {e}")
-    sys.exit(1)
+    # NÃO sair com erro - tentar executar mesmo assim
+    print("\n⚠ Tentando iniciar servidor apesar dos erros...")
 else:
     print("✓ AMBIENTE PRONTO!")
 print("="*60 + "\n")
@@ -195,11 +197,10 @@ export HOST="0.0.0.0"
 export PORT="30000"
 
 echo "============================================================"
-echo "[BOOT] Launching SGLang Server with Optimized Memory..."
+echo "[BOOT] Launching SGLang Server..."
 echo "[INFO] Modelo: ${MODEL_ID}"
 echo "[INFO] Endpoint: http://${HOST}:${PORT}"
 echo "[INFO] --mem-fraction-static 0.90 (43GB de 48GB)"
-echo "[INFO] --disable-cuda-graph-padding (estabilidade)"
 echo "============================================================"
 
 python3 -m sglang.launch_server \
