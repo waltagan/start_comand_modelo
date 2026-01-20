@@ -19,26 +19,58 @@ echo "============================================================"
 # [1/6] Instalar dependências do sistema e uv
 # ============================================================
 echo "[1/6] Instalando dependências do sistema e uv..."
-apt-get update && apt-get install -y \
+
+# Atualizar repositórios
+if ! apt-get update; then
+    echo "ERRO: Falha ao atualizar repositórios apt"
+    exit 1
+fi
+
+# Instalar dependências
+if ! apt-get install -y --no-install-recommends \
+    python3-venv \
+    python3-pip \
+    python3-dev \
+    git \
+    wget \
+    curl \
     build-essential \
     cmake \
     ninja-build \
-    git \
-    curl \
-    wget \
-    python3-pip \
-    python3-venv \
-    python3-dev \
-    libglib2.0-0 \
+    libnuma1 \
+    libnuma-dev \
+    ffmpeg \
     libsndfile1 \
     libgl1 \
-    ffmpeg \
-    libnuma1 \
-    libnuma-dev
+    libglib2.0-0; then
+    echo "ERRO: Falha ao instalar dependências do sistema"
+    exit 1
+fi
+
+# Limpar cache do apt
+rm -rf /var/lib/apt/lists/*
 
 # Instalar uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
+echo "[1.1/6] Instalando uv..."
+if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
+    echo "ERRO: Falha ao instalar uv. Tentando método alternativo..."
+    # Método alternativo: instalar via pip
+    python3 -m pip install --user uv || {
+        echo "ERRO CRÍTICO: Não foi possível instalar uv"
+        exit 1
+    }
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Verificar se uv está no PATH
+if ! command -v uv &> /dev/null; then
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! command -v uv &> /dev/null; then
+        echo "ERRO CRÍTICO: uv não encontrado no PATH"
+        exit 1
+    fi
+fi
+
 echo "uv version: $(uv --version)"
 
 # ============================================================
