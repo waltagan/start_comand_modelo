@@ -1,0 +1,23 @@
+# ============================================================
+# COMANDO PARA RUNPOD - ministral3b_sglang_uv_v19.sh
+# Cole este comando no campo "Container Start Command" do RunPod
+#
+# UV EDITION v19.0 - SUPORTE MINISTRAL 3 (modelo novo)
+#
+# ⚠️ CONFIGURAÇÃO RECOMENDADA:
+#
+# Container Image: lmsysorg/sglang:v0.4.3.post2-cu124
+# 
+# OU para container básico:
+# Container Image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+#
+# GPUs COMPATÍVEIS: A100, H100, A40, RTX 4090
+#
+# CORREÇÕES DESTA VERSÃO:
+# - Transformers 4.50.0 (suporta arquitetura 'mistral3')
+# - HF_TOKEN configurado (modelo gated)
+# - libnuma1 + libnuma-dev instalados
+# ============================================================
+
+bash -c 'apt-get update && apt-get install -y curl && curl -sL https://raw.githubusercontent.com/waltagan/start_comand_modelo/main/ministral3b_sglang_uv_v19.sh > /tmp/start.sh && bash /tmp/start.sh'
+
