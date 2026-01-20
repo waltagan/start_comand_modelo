@@ -21,7 +21,7 @@ echo "[DATA] $(date)"
 echo "============================================================"
 
 # --- ETAPA 1: DEPENDÊNCIAS DE SISTEMA ---
-echo "[1/11] Instalando dependências do sistema..."
+echo "[1/11] Instalando dependências do sistemaAA..."
 apt-get update && apt-get install -y --no-install-recommends \
     python3-venv python3-pip python3-dev \
     git wget curl \
