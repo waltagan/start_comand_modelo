@@ -3,6 +3,7 @@
 # SCRIPT PARA RUNPOD - Ministral 3B com SGLang
 # GPU: NVIDIA A40 (Ampere SM 8.6, 48GB VRAM)
 # Repositório: https://github.com/waltagan/start_comand_modelo
+# Versão: 1.2 - Fix: adicionado dill e outras deps faltantes
 # ============================================================
 
 set -e
@@ -61,11 +62,12 @@ pip install --no-cache-dir \
     "outlines>=0.0.44" gguf interegular lark \
     psutil requests aiohttp tqdm regex rich setproctitle prometheus-client
 
-# --- ETAPA 8: DEPENDÊNCIAS DO SGLANG ---
+# --- ETAPA 8: DEPENDÊNCIAS DO SGLANG (CORRIGIDO) ---
 echo "[8/10] Instalando dependências do SGLang..."
 pip install --no-cache-dir \
     ipython openai anthropic diskcache cloudpickle rpyc \
-    partial-json-parser compressed-tensors scipy
+    partial-json-parser compressed-tensors scipy \
+    dill pickle5 msgspec zmq filelock msgpack
 
 # --- ETAPA 9: SGLANG CORE ---
 echo "[9/10] Instalando SGLang..."
@@ -73,6 +75,9 @@ pip install --no-cache-dir --no-deps "sglang[all]>=0.4.3"
 pip install --no-cache-dir sgl-kernel \
     -i https://flashinfer.ai/whl/cu124/torch2.4 2>/dev/null || true
 pip install --no-cache-dir "numpy<2.0.0"
+
+# Instalar dependências extras que o --no-deps pulou
+pip install --no-cache-dir dill triton vllm 2>/dev/null || true
 
 # --- ETAPA 10: VERIFICAÇÃO ---
 echo "[10/10] Verificação..."
@@ -82,6 +87,8 @@ print(f'PyTorch: {torch.__version__}')
 print(f'CUDA: {torch.cuda.is_available()}')
 if torch.cuda.is_available():
     print(f'GPU: {torch.cuda.get_device_name(0)}')
+import dill
+print('dill: OK')
 "
 
 # Limpa locks
